@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use ProFair Observability, please cite this software."
+title: "ProFair Observability"
+type: software
+version: 0.1.0
+date-released: 2026-07-31
+authors:
+  - family-names: "González Barbado"
+    given-names: "María Dolores"
+    orcid: "https://orcid.org/0000-0002-4213-2090"
+repository-code: "https://github.com/missmew33/profair-observability"
+license: MIT
+keywords:
+  - trade fairs
+  - market observability
+  - gender representation
+  - computational social science
+  - exhibitions
+abstract: >
+  Reproducible computational framework for measuring multidimensional
+  organisational and gendered market observability in trade fairs.
