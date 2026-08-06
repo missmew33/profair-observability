@@ -1,0 +1,17 @@
+fair_id,edition_year,participation_id,organisation_id,person_id,sex_gender_classification,sex_gender_confidence,function_code,hierarchy_code,country_code,continent,total_area_m2,physical_corpus_eligible
+FAIR_A,2026,A_P1,A_O1,A_001,Woman,Verified,executive,H1,ES,Europe,120,1
+FAIR_A,2026,A_P1,A_O1,A_002,Man,High,commercial,H2,ES,Europe,120,1
+FAIR_A,2026,A_P2,A_O2,A_003,Woman,High,technical,H4,FR,Europe,40,1
+FAIR_A,2026,A_P2,A_O2,A_004,Woman,Medium,commercial,H3,FR,Europe,40,1
+FAIR_A,2026,A_P3,A_O3,A_005,Man,Verified,executive,H1,US,North America,300,1
+FAIR_A,2026,A_P3,A_O3,A_006,Man,High,technical,H4,US,North America,300,1
+FAIR_A,2026,A_P4,A_O4,A_007,Indeterminate,Unresolved,unknown,H9,JP,Asia,25,1
+FAIR_A,2026,A_P4,A_O4,A_008,Man,Medium,support,H5,JP,Asia,25,1
+FAIR_B,2025,B_P1,B_O1,B_001,Woman,Verified,executive,H1,ES,Europe,80,1
+FAIR_B,2025,B_P1,B_O1,B_002,Woman,High,commercial,H3,ES,Europe,80,1
+FAIR_B,2025,B_P2,B_O2,B_003,Man,Verified,executive,H1,DE,Europe,150,1
+FAIR_B,2025,B_P2,B_O2,B_004,Woman,High,technical,H4,DE,Europe,150,1
+FAIR_B,2025,B_P3,B_O3,B_005,Man,High,technical,H4,BR,South America,60,1
+FAIR_B,2025,B_P3,B_O3,B_006,Man,Medium,commercial,H3,BR,South America,60,1
+FAIR_B,2025,B_P4,B_O4,B_007,Woman,High,institutional,H2,MA,Africa,0,0
+FAIR_B,2025,B_P4,B_O4,B_008,Not classified,Unresolved,unknown,H9,MA,Africa,0,0

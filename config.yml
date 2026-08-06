@@ -1,0 +1,28 @@
+group_columns:
+  - fair_id
+  - edition_year
+
+leadership_codes:
+  - H1
+
+broad_leadership_codes:
+  - H1
+  - H2
+
+geography_column: continent
+area_column: total_area_m2
+
+alpha: 0.5
+beta: 0.5
+
+# Keep disabled until validation is completed.
+enable_composite: false
+minimum_composite_dimensions: 4
+
+weights:
+  demographic_presence: 1.0
+  organisational_inclusion: 1.0
+  leadership_representation: 1.0
+  functional_similarity: 1.0
+  spatial_representation: 1.0
+  geographical_similarity: 1.0

@@ -1,0 +1,214 @@
+\section{ProFair Market Observability Algorithm}
+\label{sec:profair-algorithm}
+
+\subsection{Purpose}
+
+The ProFair Market Observability Algorithm is a transparent computational
+procedure for measuring how trade fairs render markets observable through
+organisations and person--organisation--fair relations. Its primary output is
+a multidimensional profile rather than a single ranking.
+
+Let $f$ denote a fair edition, $o$ an organisation proxy, and $i$ a validated
+person--organisation--fair relation. The classified person-level population is
+
+\begin{equation}
+\mathcal{C}_{f}
+=
+\left\{
+i:
+G_i \in \{\mathrm{Woman},\mathrm{Man}\}
+\right\}.
+\end{equation}
+
+\subsection{Smoothed demographic presence}
+
+Let $W_f$ and $M_f$ be the numbers of classified women and men. To avoid
+undefined ratios in small samples, the algorithm applies Jeffreys smoothing:
+
+\begin{equation}
+\widetilde{P}_{f}
+=
+\frac{W_f+\frac{1}{2}}
+{W_f+M_f+1}.
+\end{equation}
+
+\subsection{Organisational inclusion}
+
+Let $\mathcal{O}_{f}^{C}$ be organisations containing at least one classified
+person and let $\mathcal{O}_{f}^{W}$ be organisations containing at least one
+classified woman:
+
+\begin{equation}
+\widetilde{I}_{f}
+=
+\frac{
+|\mathcal{O}_{f}^{W}|+\frac{1}{2}
+}{
+|\mathcal{O}_{f}^{C}|+1
+}.
+\end{equation}
+
+\subsection{Leadership representation}
+
+For a pre-specified leadership set $\mathcal{H}$, let $W_f^{H}$ and $M_f^{H}$
+be classified women and men occupying those levels:
+
+\begin{equation}
+\widetilde{L}_{f}
+=
+\frac{
+W_f^{H}+\frac{1}{2}
+}{
+W_f^{H}+M_f^{H}+1
+}.
+\end{equation}
+
+The narrow definition uses H1. The broad sensitivity definition uses H1 and
+H2.
+
+\subsection{Functional-distribution similarity}
+
+Let $\mathbf{p}_{f}^{W}$ and $\mathbf{p}_{f}^{M}$ be the distributions of
+women and men over validated professional functions. Functional similarity is
+
+\begin{equation}
+F_f
+=
+1-
+\sqrt{
+\frac{
+\operatorname{JSD}
+\left(
+\mathbf{p}_{f}^{W},
+\mathbf{p}_{f}^{M}
+\right)
+}{
+\log 2
+}
+},
+\end{equation}
+
+where $\operatorname{JSD}$ is the Jensen--Shannon divergence. $F_f=1$
+indicates identical distributions and $F_f=0$ maximally separated
+distributions.
+
+\subsection{Area-weighted spatial representation}
+
+Let $A_{of}$ be validated physical exhibition area and $P_{of}$ the classified
+proportion of women in organisation $o$:
+
+\begin{equation}
+S_f
+=
+\frac{
+\sum_{o \in \mathcal{O}_{f}} A_{of}P_{of}
+}{
+\sum_{o \in \mathcal{O}_{f}} A_{of}
+}.
+\end{equation}
+
+This represents materialised spatial presence, not company value or causal
+market power.
+
+\subsection{Geographical-distribution similarity}
+
+Let $\mathbf{g}_{f}^{W}$ and $\mathbf{g}_{f}^{M}$ be the distributions of
+classified women and men over organisational geographical categories:
+
+\begin{equation}
+G_f
+=
+1-
+\sqrt{
+\frac{
+\operatorname{JSD}
+\left(
+\mathbf{g}_{f}^{W},
+\mathbf{g}_{f}^{M}
+\right)
+}{
+\log 2
+}
+}.
+\end{equation}
+
+Organisational geography must not be interpreted as individual nationality or
+ethnicity.
+
+\subsection{Benchmark-adjusted representation}
+
+For dimension $k$, let $p_{kf}$ be the observed or smoothed proportion and
+$b_{kf}$ an explicit external benchmark. The signed log representation ratio is
+
+\begin{equation}
+R_{kf}
+=
+\log
+\left(
+\frac{p_{kf}}{b_{kf}}
+\right).
+\end{equation}
+
+$R_{kf}<0$ indicates representation below the benchmark, $R_{kf}=0$ equality
+with the benchmark, and $R_{kf}>0$ representation above the benchmark.
+
+A bounded parity transformation is:
+
+\begin{equation}
+Q_{kf}
+=
+\exp
+\left(
+-|R_{kf}|
+\right),
+\qquad
+0<Q_{kf}\leq 1.
+\end{equation}
+
+\subsection{Optional formative composite}
+
+The multidimensional vector
+
+\begin{equation}
+\mathbf{M}_{f}
+=
+\left(
+\widetilde{P}_{f},
+\widetilde{I}_{f},
+\widetilde{L}_{f},
+F_f,
+S_f,
+G_f
+\right)
+\end{equation}
+
+is the primary result. A composite may be calculated only as a secondary
+formative summary:
+
+\begin{equation}
+C_f
+=
+100
+\frac{
+\sum_{k \in \mathcal{K}_{f}}w_kQ_{kf}
+}{
+\sum_{k \in \mathcal{K}_{f}}w_k
+},
+\end{equation}
+
+where weights $w_k$ are specified before final outcome interpretation and
+$\mathcal{K}_{f}$ contains dimensions with adequate coverage and validation.
+
+The composite does not establish that the dimensions are interchangeable or
+reflect a single latent factor. Dimension-level results must always accompany
+$C_f$.
+
+\subsection{Uncertainty}
+
+Uncertainty is estimated by resampling organisations within fair editions.
+All person relations associated with a sampled organisation are retained
+together. Percentile intervals are obtained from the bootstrap distribution.
+
+Indeterminate classifications are assessed through lower and upper bounds,
+and registration-intensity sensitivity is assessed through repeated
+one-person-per-organisation sampling.
