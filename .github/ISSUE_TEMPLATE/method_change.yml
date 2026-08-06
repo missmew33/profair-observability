@@ -1,0 +1,17 @@
+name: Method change
+description: Propose a change to a metric, threshold, weight, or validation rule
+title: "[Method]: "
+labels: ["methodology"]
+body:
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Theoretical and methodological rationale
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Required validation evidence
+    validations:
+      required: true

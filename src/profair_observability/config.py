@@ -34,7 +34,7 @@ class AlgorithmConfig:
     )
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "AlgorithmConfig":
+    def from_yaml(cls, path: str | Path) -> AlgorithmConfig:
         with Path(path).open(encoding="utf-8") as handle:
             raw: dict[str, Any] = yaml.safe_load(handle) or {}
 
