@@ -68,6 +68,11 @@ profair profile \
   --output outputs/profile.csv
 ```
 
+The command writes a local generated result to `outputs/profile.csv`. A
+version-controlled expected synthetic result is stored in
+`examples/expected_profile.csv` for reproducibility and regression checks.
+Files generated under `outputs/` remain local and are ignored by Git.
+
 ## Data protection
 
 This public repository must never contain raw IFEMA MADRID data, names,
@@ -85,7 +90,7 @@ The CLI rejects common direct-identifier column names by default.
 profair-observability/
 ├── src/profair_observability/   Python package
 ├── tests/                       Automated tests
-├── examples/                    Synthetic demonstration
+├── examples/                    Synthetic inputs and expected reference output
 ├── docs/                        Theory, equations and validation protocol
 ├── data/                        Data-governance notice only
 ├── outputs/                     Generated local outputs, ignored by Git
