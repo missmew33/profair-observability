@@ -26,6 +26,7 @@ docs/release_checklist.md
 docs/validation_protocol.md
 examples/
 examples/config.yml
+examples/expected_profile.csv
 examples/run_example.py
 examples/synthetic_benchmarks.csv
 examples/synthetic_exhibitors.csv
@@ -33,7 +34,6 @@ notebooks/
 notebooks/01_synthetic_demo.ipynb
 outputs/
 outputs/.gitkeep
-outputs/profile.csv
 pyproject.toml
 src/
 src/profair_observability/
