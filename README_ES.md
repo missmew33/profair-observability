@@ -19,6 +19,14 @@ suficiente de validación.
 - representación espacial ponderada por superficie;
 - similitud de distribuciones geográficas.
 
+## Ejemplo sintético
+
+El comando de ejemplo genera localmente `outputs/profile.csv`. El resultado
+sintético esperado y versionado se conserva en
+`examples/expected_profile.csv` para facilitar la reproducibilidad y las
+comprobaciones de regresión. Los archivos generados dentro de `outputs/` se
+mantienen fuera del control de versiones.
+
 ## Protección de datos
 
 El repositorio público nunca debe contener datos administrativos reales,
