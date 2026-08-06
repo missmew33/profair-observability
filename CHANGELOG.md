@@ -11,3 +11,4 @@
 - Indeterminate-case bounds.
 - Synthetic demonstration data.
 - Continuous integration and tests.
+- Restored the package structure and continuous-integration workflow.
