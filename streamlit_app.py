@@ -131,7 +131,9 @@ with st.expander("Methodological guards", expanded=False):
 - Names and preliminary screening labels are **not gender evidence**.
 - Search snippets locate candidate pages but never support primary admission.
 - Identity resolution precedes attribute evidence.
+- Identity is resolved only by one `ACCEPTED` source or two independent `ACCEPTED_PROVISIONAL` sources.
 - `A_i^(B)=1` requires one qualifying official/institutional source or two independent concordant professional sources.
+- A supplied organisation domain is primary only when `organisation_domain_status=VERIFIED`; discovered domains remain candidates until verified.
 - Photographs, appearance, voice, and clothing are excluded.
 - Explicit non-binary/alternative self-description is preserved outside the binary denominator.
 - Technical search failures are flagged separately and are **not** converted into `Not Classified` analytical cases.
@@ -198,15 +200,24 @@ with restricted_tab:
                 else:
                     df = pd.read_csv(io.BytesIO(uploaded_bytes))
                     st.write(f"Loaded {len(df):,} rows.")
+                    if "organisation_domain_status" not in df.columns:
+                        st.info(
+                            "No organisation_domain_status column is present. "
+                            "Organisation domains discovered in this run will "
+                            "remain candidates and will not become primary "
+                            "official evidence automatically."
+                        )
                     preview_cols = [
-                        c
-                        for c in [
+                        column
+                        for column in [
                             "audit_case_id",
                             "person_id",
                             "primary_fair",
                             "priority",
+                            "organisation_domain",
+                            "organisation_domain_status",
                         ]
-                        if c in df.columns
+                        if column in df.columns
                     ]
                     if preview_cols:
                         st.dataframe(df[preview_cols].head(20), width="stretch")
@@ -293,6 +304,26 @@ with restricted_tab:
                     (results["processing_status"] == "TECHNICAL_FAILURE").sum()
                 )
                 c5.metric("Technical failures", technical)
+
+                candidate_mask = results[
+                    "candidate_organisation_domains"
+                ].astype(str).str.len() > 0
+                if candidate_mask.any():
+                    st.subheader("Organisation domains requiring verification")
+                    domain_cols = [
+                        column
+                        for column in [
+                            "audit_case_id",
+                            "person_id",
+                            "org_search_target",
+                            "candidate_organisation_domains",
+                        ]
+                        if column in results.columns
+                    ]
+                    st.dataframe(
+                        results.loc[candidate_mask, domain_cols],
+                        width="stretch",
+                    )
 
                 partial = int(
                     (
