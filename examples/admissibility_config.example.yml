@@ -1,0 +1,8 @@
+pipeline_status: PRE_RELEASE_AUDIT
+search_provider: serpapi
+max_queries_per_person: 5
+max_results_per_query: 5
+max_candidate_urls_per_person: 8
+allow_auto_official_high: false
+trusted_official_domains: []
+restricted_mode_required: true
