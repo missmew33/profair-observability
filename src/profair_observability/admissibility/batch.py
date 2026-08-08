@@ -12,7 +12,7 @@ from .retrieval import SourceRetriever
 from .schema import REQUIRED_INPUT_FIELDS, PersonDecision, RetrievalStatus
 from .search import QueryBuilder, SearchProvider, collect_candidates
 
-PIPELINE_VERSION = "2.2.8-pre-release"
+PIPELINE_VERSION = "2.2.9-pre-release"
 
 
 def validate_input(df: pd.DataFrame) -> None:
@@ -246,6 +246,10 @@ def run_batch(
             "checkpoint_every": checkpoint_every,
             "identity_gate": (
                 "ACCEPTED or two independent ACCEPTED_PROVISIONAL sources"
+            ),
+            "expanded_name_rule": (
+                "source forms containing all recorded name tokens in order with "
+                "limited inserted middle/legal-name tokens are provisional only"
             ),
             "organisation_identity_context": (
                 "evaluate org_search_target, account_name and trade_name; "
