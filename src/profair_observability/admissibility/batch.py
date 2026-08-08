@@ -12,7 +12,7 @@ from .retrieval import SourceRetriever
 from .schema import REQUIRED_INPUT_FIELDS, PersonDecision
 from .search import QueryBuilder, SearchProvider, collect_candidates
 
-PIPELINE_VERSION = "2.2.4-pre-release"
+PIPELINE_VERSION = "2.2.5-pre-release"
 
 
 def validate_input(df: pd.DataFrame) -> None:
@@ -40,7 +40,12 @@ def _technical_search_failure(
         full_name=str(row.get("full_name", "") or "").strip(),
         org_search_target=str(row.get("org_search_target", "") or "").strip(),
         primary_fair=str(row.get("primary_fair", "") or ""),
+        organisation_domain=str(row.get("organisation_domain", "") or "").strip(),
+        organisation_domain_status=str(
+            row.get("organisation_domain_status", "") or "UNKNOWN"
+        ).upper(),
         identity_resolved=False,
+        identity_resolution_rule="technical_search_failure_not_analytical",
         A_i_B=0,
         final_category="",
         decision_rule="technical_search_failure_not_analytical",
@@ -80,8 +85,8 @@ def run_batch(
 
     for position, (_, series) in enumerate(df.iterrows(), start=1):
         row = {
-            k: ("" if pd.isna(v) else v)
-            for k, v in series.to_dict().items()
+            key: ("" if pd.isna(value) else value)
+            for key, value in series.to_dict().items()
         }
         person_id = str(row.get("person_id", ""))
         if progress:
@@ -117,7 +122,8 @@ def run_batch(
 
         decisions.append(decision)
         flat = decision.to_flat_dict()
-        flat["query_count"] = len(queries)
+        flat["generated_query_count"] = len(queries)
+        flat["executed_search_count"] = len(person_attempts)
         flat["candidate_url_count"] = len(candidates)
         flat["retrieved_full_text_count"] = sum(
             1
@@ -156,6 +162,12 @@ def run_batch(
                 trusted_official_domains or set()
             ),
             "checkpoint_every": checkpoint_every,
+            "identity_gate": (
+                "ACCEPTED or two independent ACCEPTED_PROVISIONAL sources"
+            ),
+            "organisation_domain_rule": (
+                "organisation_domain is primary only when status=VERIFIED"
+            ),
         },
     )
     manifest["summary"] = {
@@ -184,10 +196,7 @@ def run_batch(
         if not results.empty
         else 0,
         "n_partial_search_failure": int(
-            (
-                results["processing_status"]
-                == "PARTIAL_SEARCH_FAILURE"
-            ).sum()
+            (results["processing_status"] == "PARTIAL_SEARCH_FAILURE").sum()
         )
         if not results.empty
         else 0,
