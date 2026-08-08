@@ -15,8 +15,14 @@ source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 export PROFAIR_RESTRICTED_MODE=1
 export SERPAPI_API_KEY=YOUR_KEY
-streamlit run streamlit_app.py
+streamlit run streamlit_app.py --server.address 127.0.0.1
 ```
+
+The loopback binding is preferred for restricted direct-identifier audits on a local workstation.
+
+## Retrieval scope
+
+The automated retriever supports HTML/plain text and PDFs with embedded text. OCR, image interpretation, photographs, appearance, and authenticated/social-network crawling are outside the automated evidence pipeline. Blocked, JavaScript-only, inaccessible, or non-extractable resources are recorded as retrieval failures rather than silently treated as negative evidence.
 
 ## Streamlit Community Cloud
 
@@ -24,4 +30,4 @@ Use only for the public synthetic demo. Point the app entry file to `streamlit_a
 
 ## Private Streamlit deployment
 
-A private VM/container may enable restricted mode. The operator is responsible for institutional data-governance approval, search-provider terms, secrets management, and access control.
+A private VM/container may enable restricted mode. The operator is responsible for institutional data-governance approval, search-provider terms, secrets management, and access control. Restricted audit bundles may contain direct identifiers and evidence URLs and must remain outside the public repository.
