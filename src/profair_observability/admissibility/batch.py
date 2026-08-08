@@ -12,7 +12,7 @@ from .retrieval import SourceRetriever
 from .schema import REQUIRED_INPUT_FIELDS, PersonDecision
 from .search import QueryBuilder, SearchProvider, collect_candidates
 
-PIPELINE_VERSION = "2.2.3-pre-release"
+PIPELINE_VERSION = "2.2.4-pre-release"
 
 
 def validate_input(df: pd.DataFrame) -> None:
