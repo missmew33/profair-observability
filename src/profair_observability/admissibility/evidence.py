@@ -4,15 +4,10 @@ import re
 
 from unidecode import unidecode
 
+from .identity import find_name_spans
 from .schema import EvidenceHit, FinalCategory
-from .search import name_variants
 
 MAX_INTERVENING_TOKENS = 4
-
-
-def _norm_name(text: str) -> str:
-    text = unidecode(text or "").casefold()
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def _norm_text(text: str) -> str:
@@ -187,23 +182,10 @@ CROSS_LANGUAGE_AMBIGUOUS = {
 
 
 def _target_spans(norm_sentence: str, full_name: str) -> list[tuple[int, int]]:
-    spans: list[tuple[int, int]] = []
-    seen: set[tuple[int, int]] = set()
-    for variant in name_variants(full_name):
-        target = _norm_name(variant)
-        if not target:
-            continue
-        start = 0
-        while True:
-            pos = norm_sentence.find(target, start)
-            if pos < 0:
-                break
-            span = (pos, pos + len(target))
-            if span not in seen:
-                seen.add(span)
-                spans.append(span)
-            start = pos + max(1, len(target))
-    return spans
+    return [
+        (start, end)
+        for start, end, _match_kind in find_name_spans(norm_sentence, full_name)
+    ]
 
 
 def _intervening_gap(
