@@ -48,7 +48,7 @@ def test_queries_never_use_preliminary_classification() -> None:
     }
     queries = QueryBuilder().build(row)
     assert queries
-    assert all("Woman" not in q for q in queries)
+    assert all("Woman" not in query for query in queries)
 
 
 def test_identity_requires_nearby_organisation_context() -> None:
@@ -62,12 +62,13 @@ def test_identity_requires_nearby_organisation_context() -> None:
     assert match.status == "REJECTED_NO_COOCCURRENCE"
 
 
-def test_official_direct_gendered_evidence_is_admissible() -> None:
+def test_verified_official_direct_gendered_evidence_is_admissible() -> None:
     row = {
         "person_id": "PX1",
         "full_name": "Ana Ejemplo",
         "org_search_target": "Ejemplo Uno",
         "organisation_domain": "ejemplouno.org",
+        "organisation_domain_status": "VERIFIED",
         "preliminary_classification": "",
     }
     decision = AdmissibilityEngine().evaluate(
@@ -81,6 +82,30 @@ def test_official_direct_gendered_evidence_is_admissible() -> None:
     )
     assert decision.A_i_B == 1
     assert decision.final_category == "Woman"
+
+
+def test_unverified_supplied_domain_is_not_primary_evidence() -> None:
+    row = {
+        "person_id": "PX_DOMAIN",
+        "full_name": "Ana Ejemplo",
+        "org_search_target": "Ejemplo Uno",
+        "organisation_domain": "ejemplouno.org",
+        "organisation_domain_status": "CANDIDATE",
+        "preliminary_classification": "",
+    }
+    decision = AdmissibilityEngine().evaluate(
+        row,
+        [
+            source(
+                "https://ejemplouno.org/equipo",
+                "Ana Ejemplo es directora de innovación de Ejemplo Uno.",
+            )
+        ],
+    )
+    assert decision.identity_resolved is True
+    assert decision.A_i_B == 0
+    assert decision.final_category == "Indeterminate"
+    assert decision.candidate_organisation_domains == ["ejemplouno.org"]
 
 
 def test_single_secondary_source_is_not_admissible() -> None:
@@ -103,12 +128,90 @@ def test_single_secondary_source_is_not_admissible() -> None:
     assert decision.final_category == "Indeterminate"
 
 
+def test_single_provisional_identity_is_not_resolved() -> None:
+    row = {
+        "person_id": "PX_PROV1",
+        "full_name": "Target Person",
+        "org_search_target": "Example Mobility Group",
+        "preliminary_classification": "",
+    }
+    decision = AdmissibilityEngine().evaluate(
+        row,
+        [
+            source(
+                "https://profile.test/person",
+                "Target Person works with Mobility on international projects.",
+            )
+        ],
+    )
+    assert decision.provisional_identity_count == 1
+    assert decision.identity_resolved is False
+    assert decision.final_category == "Not Classified"
+    assert decision.decision_rule == "identity_only_provisionally_resolved"
+
+
+def test_two_independent_provisional_identities_resolve_identity() -> None:
+    row = {
+        "person_id": "PX_PROV2",
+        "full_name": "Target Person",
+        "org_search_target": "Example Mobility Group",
+        "preliminary_classification": "",
+    }
+    decision = AdmissibilityEngine().evaluate(
+        row,
+        [
+            source(
+                "https://profile-a.test/person",
+                "Target Person works with Mobility on international projects.",
+            ),
+            source(
+                "https://profile-b.test/people/target",
+                "Conference biography: Target Person collaborates with Mobility "
+                "on market development and research.",
+            ),
+        ],
+    )
+    assert decision.provisional_identity_count == 2
+    assert decision.identity_resolved is True
+    assert decision.identity_resolution_rule == (
+        "two_independent_provisional_identity_sources"
+    )
+    assert decision.identity_source_independence_status == "INDEPENDENT"
+    assert decision.final_category == "Indeterminate"
+
+
+def test_two_same_domain_provisional_identities_do_not_resolve_identity() -> None:
+    row = {
+        "person_id": "PX_PROV3",
+        "full_name": "Target Person",
+        "org_search_target": "Example Mobility Group",
+        "preliminary_classification": "",
+    }
+    decision = AdmissibilityEngine().evaluate(
+        row,
+        [
+            source(
+                "https://profiles.test/a",
+                "Target Person works with Mobility on international projects.",
+            ),
+            source(
+                "https://profiles.test/b",
+                "Target Person collaborates with Mobility on market development.",
+            ),
+        ],
+    )
+    assert decision.provisional_identity_count == 2
+    assert decision.identity_resolved is False
+    assert decision.final_category == "Not Classified"
+
+
 def test_gender_marker_elsewhere_on_page_is_not_attributed() -> None:
     row = {
         "person_id": "PX3",
         "full_name": "Alex Example",
         "org_search_target": "Example Three",
         "organisation_domain": "examplethree.org",
+        "organisation_domain_status": "VERIFIED",
         "preliminary_classification": "",
     }
     text = (
@@ -159,15 +262,15 @@ def test_english_president_near_byline_is_not_gender_evidence() -> None:
 
 def test_exact_duplicate_sources_are_not_independent() -> None:
     text = "Target Person is director of Example Org."
-    a = EvaluatedSource(
+    left = EvaluatedSource(
         source("https://a.test/x", text, sha="same"),
         "ACCEPTED",
     )
-    b = EvaluatedSource(
+    right = EvaluatedSource(
         source("https://b.test/y", text, sha="same"),
         "ACCEPTED",
     )
-    assert assess_pair(a, b).status == IndependenceStatus.EXACT_DUPLICATE.value
+    assert assess_pair(left, right).status == IndependenceStatus.EXACT_DUPLICATE.value
 
 
 def test_public_mode_rejects_direct_identifiers(
