@@ -50,6 +50,48 @@ def name_variants(full_name: str) -> list[str]:
     return out
 
 
+class QueryBuilder:
+    def __init__(self, max_queries: int = 6) -> None:
+        self.max_queries = max_queries
+
+    def build(self, row: dict) -> list[str]:
+        full_name = _clean(row.get("full_name", ""))
+        org = organisation_target(row)
+        country = _clean(row.get("country_code", ""))
+        trade_name = _clean(row.get("trade_name", ""))
+        account_name = _clean(row.get("account_name", ""))
+        if not full_name:
+            return []
+
+        names = name_variants(full_name)
+        org_variants = []
+        for value in (org, trade_name, account_name):
+            if value and value.casefold() not in {
+                item.casefold() for item in org_variants
+            }:
+                org_variants.append(value)
+
+        queries = []
+        for name in names:
+            if org_variants:
+                queries.append(f'"{name}" "{org_variants[0]}"')
+                queries.append(f'"{name}" {org_variants[0]}')
+            else:
+                queries.append(f'"{name}"')
+        if len(org_variants) > 1:
+            queries.append(f'"{names[0]}" "{org_variants[1]}"')
+        if country and org:
+            queries.append(f'"{names[0]}" "{org}" {country}')
+
+        unique, seen = [], set()
+        for query in queries:
+            key = query.casefold()
+            if key not in seen:
+                seen.add(key)
+                unique.append(query)
+        return unique[: self.max_queries]
+
+
 def create_robust_session(
     retries: int = 2,
     backoff_factor: float = 1.5,
