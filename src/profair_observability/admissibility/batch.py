@@ -12,7 +12,7 @@ from .retrieval import SourceRetriever
 from .schema import REQUIRED_INPUT_FIELDS, PersonDecision
 from .search import QueryBuilder, SearchProvider, collect_candidates
 
-PIPELINE_VERSION = "2.2.5-pre-release"
+PIPELINE_VERSION = "2.2.6-pre-release"
 
 
 def validate_input(df: pd.DataFrame) -> None:
@@ -164,6 +164,13 @@ def run_batch(
             "checkpoint_every": checkpoint_every,
             "identity_gate": (
                 "ACCEPTED or two independent ACCEPTED_PROVISIONAL sources"
+            ),
+            "organisation_identity_context": (
+                "evaluate org_search_target, account_name and trade_name; "
+                "exact matches on weak aliases are downgraded to provisional"
+            ),
+            "search_budget_rule": (
+                "candidate URL budget is distributed across distinct queries"
             ),
             "organisation_domain_rule": (
                 "organisation_domain is primary only when status=VERIFIED"
