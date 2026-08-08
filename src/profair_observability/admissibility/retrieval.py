@@ -7,16 +7,19 @@ import os
 import re
 import socket
 import time
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from pypdf import PdfReader
 
 from .schema import RetrievedSource, RetrievalStatus, SearchCandidate
 
 DEFAULT_TIMEOUT = 10.0
 MAX_CONTENT_LENGTH = 2_000_000
+MAX_PDF_CONTENT_LENGTH = 8_000_000
 SAFE_UNWANTED_TAGS = ["script", "style", "noscript", "svg", "iframe", "form", "button"]
 
 
@@ -56,15 +59,27 @@ def clean_html(html: str) -> tuple[str, str]:
     return text, title
 
 
+def extract_pdf_text(content: bytes) -> str:
+    """Extract embedded PDF text only; OCR is deliberately out of scope."""
+    reader = PdfReader(BytesIO(content), strict=False)
+    pages: list[str] = []
+    for page in reader.pages:
+        page_text = page.extract_text() or ""
+        if page_text.strip():
+            pages.append(page_text)
+    return re.sub(r"\s+", " ", " ".join(pages)).strip()
+
+
 class SourceRetriever:
-    def __init__(self, cache_dir: str | os.PathLike[str] = ".profair_cache", timeout: float = DEFAULT_TIMEOUT, max_content_length: int = MAX_CONTENT_LENGTH, per_domain_delay: float = 0.4) -> None:
+    def __init__(self, cache_dir: str | os.PathLike[str] = ".profair_cache", timeout: float = DEFAULT_TIMEOUT, max_content_length: int = MAX_CONTENT_LENGTH, max_pdf_content_length: int = MAX_PDF_CONTENT_LENGTH, per_domain_delay: float = 0.4) -> None:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         self.max_content_length = max_content_length
+        self.max_pdf_content_length = max_pdf_content_length
         self.per_domain_delay = per_domain_delay
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "Mozilla/5.0 (compatible; ProFairResearchBot/2.2.2; +https://github.com/missmew33/profair-observability)"})
+        self.session.headers.update({"User-Agent": "Mozilla/5.0 (compatible; ProFairResearchBot/2.2.8; +https://github.com/missmew33/profair-observability)"})
         self._last_request_by_host: dict[str, float] = {}
 
     def _cache_path(self, url: str) -> Path:
@@ -130,30 +145,55 @@ class SourceRetriever:
                 record.retrieval_status = RetrievalStatus.HTTP_ERROR.value
                 record.error_message = f"HTTP {response.status_code}"
                 return record
+
             content_type = response.headers.get("Content-Type", "").lower()
             record.content_type = content_type
-            if not any(kind in content_type for kind in ("text/html", "text/plain", "application/xhtml+xml")):
+            is_pdf = "application/pdf" in content_type or response.url.lower().endswith(".pdf")
+            is_text = any(kind in content_type for kind in ("text/html", "text/plain", "application/xhtml+xml"))
+            if not is_pdf and not is_text:
                 record.retrieval_status = RetrievalStatus.NON_TEXT_RESOURCE.value
                 record.error_message = f"Unsupported content type: {content_type or 'unknown'}"
                 return record
+
+            max_length = self.max_pdf_content_length if is_pdf else self.max_content_length
             header_len = response.headers.get("Content-Length")
             if header_len:
                 try:
-                    if int(header_len) > self.max_content_length:
+                    if int(header_len) > max_length:
                         record.retrieval_status = RetrievalStatus.CONTENT_TOO_LARGE.value
                         record.error_message = "Content-Length exceeds configured maximum."
                         return record
                 except ValueError:
                     pass
+
             content = bytearray()
             for chunk in response.iter_content(chunk_size=8192):
                 if not chunk:
                     continue
                 content.extend(chunk)
-                if len(content) > self.max_content_length:
+                if len(content) > max_length:
                     record.retrieval_status = RetrievalStatus.CONTENT_TOO_LARGE.value
                     record.error_message = "Downloaded body exceeded configured maximum."
                     return record
+
+            if is_pdf:
+                try:
+                    text = extract_pdf_text(bytes(content))
+                except Exception as exc:
+                    record.retrieval_status = RetrievalStatus.NON_TEXT_RESOURCE.value
+                    record.error_message = f"PDF text extraction failed: {type(exc).__name__}"
+                    return record
+                if len(text) < 100:
+                    record.retrieval_status = RetrievalStatus.NON_TEXT_RESOURCE.value
+                    record.error_message = "PDF contained insufficient extractable embedded text; OCR not used."
+                    return record
+                record.full_text = text
+                record.page_title = candidate.title
+                record.content_sha256 = sha256_text(text)
+                record.retrieval_status = RetrievalStatus.FULL_TEXT_RETRIEVED.value
+                self._save_cache(record)
+                return record
+
             raw = bytes(content).decode(response.encoding or "utf-8", errors="replace")
             text, title = clean_html(raw)
             if len(text) < 100:
