@@ -14,17 +14,98 @@ from urllib3.util.retry import Retry
 from .schema import SearchCandidate
 
 
+LEGAL_OR_GENERIC_SUFFIXES = {
+    "sa",
+    "sl",
+    "srl",
+    "spa",
+    "ltd",
+    "limited",
+    "inc",
+    "llc",
+    "gmbh",
+    "group",
+    "company",
+    "corporation",
+    "corp",
+}
+ARTICLE_STOPWORDS = {
+    "the",
+    "and",
+    "of",
+    "de",
+    "del",
+    "la",
+    "las",
+    "los",
+    "el",
+    "da",
+    "do",
+    "di",
+}
+
+
 def _clean(value: object) -> str:
     text = "" if value is None else str(value).strip()
     return "" if text.lower() in {"nan", "none"} else text
 
 
-def organisation_target(row: dict) -> str:
-    for key in ("org_search_target", "trade_name", "account_name"):
+def _norm_org(value: object) -> str:
+    text = unidecode(_clean(value)).casefold()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _informative_org_tokens(value: object) -> list[str]:
+    return [
+        token
+        for token in _norm_org(value).split()
+        if token not in ARTICLE_STOPWORDS and token not in LEGAL_OR_GENERIC_SUFFIXES
+    ]
+
+
+def organisation_aliases(row: dict) -> list[str]:
+    aliases: list[str] = []
+    seen: set[str] = set()
+    for key in ("org_search_target", "account_name", "trade_name"):
         value = _clean(row.get(key, ""))
-        if value:
-            return value
-    return ""
+        norm = _norm_org(value)
+        if value and norm and norm not in seen:
+            seen.add(norm)
+            aliases.append(value)
+    return aliases
+
+
+def weak_identity_aliases(row: dict) -> set[str]:
+    """Return aliases too generic to make an exact text match strong by itself.
+
+    A short trade/destination label is treated as weak when it is fully
+    contained in a materially more specific account/legal entity. Legal-only
+    suffixes such as Ltd/SL/Corporation do not make the longer form stronger.
+    """
+    target = _clean(row.get("org_search_target", ""))
+    account = _clean(row.get("account_name", ""))
+    if not target or not account:
+        return set()
+
+    target_tokens = set(_informative_org_tokens(target))
+    account_tokens = set(_informative_org_tokens(account))
+    if not target_tokens or not account_tokens:
+        return set()
+
+    additional = account_tokens - target_tokens
+    if (
+        target_tokens < account_tokens
+        and len(target_tokens) <= 2
+        and len(additional) >= 2
+    ):
+        return {_norm_org(target)}
+    return set()
+
+
+def organisation_target(row: dict) -> str:
+    aliases = organisation_aliases(row)
+    return aliases[0] if aliases else ""
 
 
 def name_variants(full_name: str) -> list[str]:
@@ -56,32 +137,30 @@ class QueryBuilder:
 
     def build(self, row: dict) -> list[str]:
         full_name = _clean(row.get("full_name", ""))
-        org = organisation_target(row)
         country = _clean(row.get("country_code", ""))
-        trade_name = _clean(row.get("trade_name", ""))
-        account_name = _clean(row.get("account_name", ""))
         if not full_name:
             return []
 
         names = name_variants(full_name)
-        org_variants = []
-        for value in (org, trade_name, account_name):
-            if value and value.casefold() not in {
-                item.casefold() for item in org_variants
-            }:
-                org_variants.append(value)
+        aliases = organisation_aliases(row)
+        queries: list[str] = []
 
-        queries = []
-        for name in names:
-            if org_variants:
-                queries.append(f'"{name}" "{org_variants[0]}"')
-                queries.append(f'"{name}" {org_variants[0]}')
+        # Search distinct organisation representations before looser fallbacks.
+        if aliases:
+            for alias in aliases:
+                queries.append(f'"{names[0]}" "{alias}"')
+            queries.append(f'"{names[0]}" {aliases[0]}')
+        else:
+            queries.append(f'"{names[0]}"')
+
+        for name in names[1:]:
+            if aliases:
+                queries.append(f'"{name}" "{aliases[0]}"')
             else:
                 queries.append(f'"{name}"')
-        if len(org_variants) > 1:
-            queries.append(f'"{names[0]}" "{org_variants[1]}"')
-        if country and org:
-            queries.append(f'"{names[0]}" "{org}" {country}')
+
+        if country and aliases:
+            queries.append(f'"{names[0]}" "{aliases[0]}" {country}')
 
         unique, seen = [], set()
         for query in queries:
@@ -198,25 +277,13 @@ class SerpAPISearchProvider(SearchProvider):
             response.raise_for_status()
             payload = response.json()
         except requests.Timeout as exc:
-            self._record_attempt(
-                query=query,
-                status="TIMEOUT",
-                error=str(exc),
-            )
+            self._record_attempt(query=query, status="TIMEOUT", error=str(exc))
             return []
         except requests.RequestException as exc:
-            self._record_attempt(
-                query=query,
-                status="REQUEST_ERROR",
-                error=str(exc),
-            )
+            self._record_attempt(query=query, status="REQUEST_ERROR", error=str(exc))
             return []
         except ValueError as exc:
-            self._record_attempt(
-                query=query,
-                status="INVALID_JSON",
-                error=str(exc),
-            )
+            self._record_attempt(query=query, status="INVALID_JSON", error=str(exc))
             return []
 
         candidates = []
@@ -236,11 +303,7 @@ class SerpAPISearchProvider(SearchProvider):
                         snippet=item.get("snippet", "") or "",
                     )
                 )
-        self._record_attempt(
-            query=query,
-            status="OK",
-            result_count=len(candidates),
-        )
+        self._record_attempt(query=query, status="OK", result_count=len(candidates))
         return candidates
 
 
@@ -285,25 +348,13 @@ class BraveSearchProvider(SearchProvider):
             response.raise_for_status()
             payload = response.json()
         except requests.Timeout as exc:
-            self._record_attempt(
-                query=query,
-                status="TIMEOUT",
-                error=str(exc),
-            )
+            self._record_attempt(query=query, status="TIMEOUT", error=str(exc))
             return []
         except requests.RequestException as exc:
-            self._record_attempt(
-                query=query,
-                status="REQUEST_ERROR",
-                error=str(exc),
-            )
+            self._record_attempt(query=query, status="REQUEST_ERROR", error=str(exc))
             return []
         except ValueError as exc:
-            self._record_attempt(
-                query=query,
-                status="INVALID_JSON",
-                error=str(exc),
-            )
+            self._record_attempt(query=query, status="INVALID_JSON", error=str(exc))
             return []
 
         results = payload.get("web", {}).get("results", [])
@@ -321,11 +372,7 @@ class BraveSearchProvider(SearchProvider):
                         snippet=item.get("description", "") or "",
                     )
                 )
-        self._record_attempt(
-            query=query,
-            status="OK",
-            result_count=len(candidates),
-        )
+        self._record_attempt(query=query, status="OK", result_count=len(candidates))
         return candidates
 
 
@@ -335,12 +382,24 @@ def collect_candidates(
     max_results_per_query: int = 5,
     max_urls: int = 12,
 ) -> list[SearchCandidate]:
-    candidates, seen_urls = [], set()
-    for query in queries:
-        for candidate in provider.search(
-            query,
-            max_results=max_results_per_query,
-        ):
+    query_list = list(queries)
+    if not query_list or max_urls <= 0:
+        return []
+
+    # Spread the URL budget across distinct queries so the first query cannot
+    # crowd out alternative organisation aliases.
+    per_query_limit = max(
+        1,
+        min(
+            max_results_per_query,
+            (max_urls + len(query_list) - 1) // len(query_list),
+        ),
+    )
+
+    candidates: list[SearchCandidate] = []
+    seen_urls: set[str] = set()
+    for query in query_list:
+        for candidate in provider.search(query, max_results=per_query_limit):
             if candidate.url in seen_urls:
                 continue
             seen_urls.add(candidate.url)
