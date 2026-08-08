@@ -136,7 +136,7 @@ with st.expander("Methodological guards", expanded=False):
 - A supplied organisation domain is primary only when `organisation_domain_status=VERIFIED`; discovered domains remain candidates until verified.
 - Photographs, appearance, voice, and clothing are excluded.
 - Explicit non-binary/alternative self-description is preserved outside the binary denominator.
-- Technical search failures are flagged separately and are **not** converted into `Not Classified` analytical cases.
+- Search and retrieval failures are technical states and are not converted into analytical `Not Classified` cases when no full text was available.
 """
     )
 
@@ -282,6 +282,20 @@ with restricted_tab:
                 status.success("Audit run completed.")
                 st.dataframe(results, width="stretch")
 
+                technical_statuses = {
+                    "TECHNICAL_FAILURE",
+                    "TECHNICAL_RETRIEVAL_FAILURE",
+                }
+                technical = int(
+                    results["processing_status"].isin(technical_statuses).sum()
+                )
+                partial = int(
+                    results["processing_status"]
+                    .astype(str)
+                    .str.startswith("PARTIAL_")
+                    .sum()
+                )
+
                 c1, c2, c3, c4, c5 = st.columns(5)
                 c1.metric("A=1", int(results["A_i_B"].sum()))
                 c2.metric(
@@ -299,9 +313,6 @@ with restricted_tab:
                         .isin(["Indeterminate", "Not Classified"])
                         .sum()
                     ),
-                )
-                technical = int(
-                    (results["processing_status"] == "TECHNICAL_FAILURE").sum()
                 )
                 c5.metric("Technical failures", technical)
 
@@ -325,18 +336,14 @@ with restricted_tab:
                         width="stretch",
                     )
 
-                partial = int(
-                    (
-                        results["processing_status"]
-                        == "PARTIAL_SEARCH_FAILURE"
-                    ).sum()
-                )
                 if technical or partial:
                     st.warning(
-                        f"Search-layer issues recorded: {technical} technical "
-                        f"failure(s), {partial} partial search failure(s). "
-                        "These are preserved in provenance and must not be "
-                        "interpreted as substantive non-classification."
+                        f"Technical search/retrieval states recorded: "
+                        f"{technical} complete failure(s), {partial} partial "
+                        "failure(s). Inspect `processing_status`, "
+                        "`retrieval_error_count`, and the full provenance bundle. "
+                        "Complete technical failures are excluded from analytical "
+                        "Not Classified counts."
                     )
 
                 st.download_button(
