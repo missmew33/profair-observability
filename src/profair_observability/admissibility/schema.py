@@ -138,7 +138,10 @@ class PersonDecision:
     processing_status: str = "COMPLETED"
     search_attempt_count: int = 0
     search_error_count: int = 0
+    retrieval_error_count: int = 0
     search_attempts: list[dict[str, Any]] = field(default_factory=list)
+    search_candidates: list[dict[str, Any]] = field(default_factory=list)
+    retrieval_attempts: list[dict[str, Any]] = field(default_factory=list)
     sources: list[EvaluatedSource] = field(default_factory=list)
 
     def to_flat_dict(self) -> dict[str, Any]:
@@ -171,6 +174,7 @@ class PersonDecision:
             "processing_status": self.processing_status,
             "search_attempt_count": self.search_attempt_count,
             "search_error_count": self.search_error_count,
+            "retrieval_error_count": self.retrieval_error_count,
         }
 
     def to_provenance_dict(self) -> dict[str, Any]:
