@@ -12,7 +12,7 @@ from .retrieval import SourceRetriever
 from .schema import REQUIRED_INPUT_FIELDS, PersonDecision, RetrievalStatus
 from .search import QueryBuilder, SearchProvider, collect_candidates
 
-PIPELINE_VERSION = "2.2.7-pre-release"
+PIPELINE_VERSION = "2.2.8-pre-release"
 
 
 def validate_input(df: pd.DataFrame) -> None:
@@ -257,6 +257,10 @@ def run_batch(
             "retrieval_failure_rule": (
                 "zero full-text retrievals after candidate discovery are "
                 "technical failures, not analytical Not Classified cases"
+            ),
+            "pdf_retrieval_rule": (
+                "embedded PDF text is eligible for normal evidence evaluation; "
+                "OCR and image-based inference are not used"
             ),
             "organisation_domain_rule": (
                 "organisation_domain is primary only when status=VERIFIED"
