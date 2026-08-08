@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from profair_observability.admissibility.engine import AdmissibilityEngine
+from profair_observability.admissibility.evidence import EvidenceExtractor
+from profair_observability.admissibility.identity import IdentityResolver
 from profair_observability.admissibility.schema import (
     RetrievalStatus,
     RetrievedSource,
@@ -91,6 +93,25 @@ def test_specific_account_alias_can_resolve_identity() -> None:
     assert decision.accepted_identity_count == 1
     assert decision.identity_resolved is True
     assert decision.final_category == "Indeterminate"
+
+
+def test_expanded_legal_name_is_provisional_identity_evidence() -> None:
+    match = IdentityResolver().evaluate(
+        "Alex Maria de los Santos Rivera works for Arcadia Tourism Office.",
+        "Alex Maria Rivera",
+        "Arcadia Tourism Office",
+    )
+    assert match.status == "ACCEPTED_PROVISIONAL"
+    assert "Expanded full-name form" in match.reason
+
+
+def test_expanded_legal_name_can_anchor_local_gender_evidence() -> None:
+    hits = EvidenceExtractor().extract(
+        "Alex Maria de los Santos Rivera es directora de operaciones.",
+        "Alex Maria Rivera",
+        "https://example.test/profile",
+    )
+    assert any(hit.category == "Woman" and hit.marker == "directora" for hit in hits)
 
 
 def test_query_builder_prioritises_distinct_organisation_aliases() -> None:
