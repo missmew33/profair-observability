@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
+
+from unidecode import unidecode
 
 from .domains import registrable_domain
 from .evidence import EvidenceExtractor
@@ -17,6 +20,7 @@ from .schema import (
     RetrievalStatus,
     SourceType,
 )
+from .search import organisation_aliases, weak_identity_aliases
 from .source_typing import classify_source
 
 STRICT_OFFICIAL_TYPES = {
@@ -31,6 +35,12 @@ def _normalise_domain_status(value: object) -> str:
     status = str(value or "").strip().upper()
     allowed = {item.value for item in OrganisationDomainStatus}
     return status if status in allowed else OrganisationDomainStatus.UNKNOWN.value
+
+
+def _normalise_alias(value: object) -> str:
+    text = unidecode(str(value or "")).casefold()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _independent_provisional_pair(
@@ -76,6 +86,55 @@ class AdmissibilityEngine:
             types.add(SourceType.OFFICIAL_AUTO_HIGH.value)
         return types
 
+    def _resolve_source_identity(
+        self,
+        *,
+        row: dict,
+        source: RetrievedSource,
+        full_name: str,
+    ) -> tuple[str, str, str]:
+        aliases = organisation_aliases(row)
+        weak_aliases = weak_identity_aliases(row)
+        if not aliases:
+            match = self.identity.evaluate(source.full_text, full_name, "")
+            return match.status, match.excerpt, match.reason
+
+        scored: list[tuple[int, int, str, str, str]] = []
+        status_rank = {
+            IdentityStatus.ACCEPTED.value: 3,
+            IdentityStatus.ACCEPTED_PROVISIONAL.value: 2,
+            IdentityStatus.REJECTED_NO_COOCCURRENCE.value: 1,
+            IdentityStatus.REJECTED_NO_NAME.value: 0,
+            IdentityStatus.REJECTED_NO_CONTEXT.value: 0,
+            IdentityStatus.REJECTED_HOMONYM_RISK.value: 0,
+        }
+
+        for position, alias in enumerate(aliases):
+            match = self.identity.evaluate(source.full_text, full_name, alias)
+            status = match.status
+            reason = match.reason
+            alias_norm = _normalise_alias(alias)
+            if status == IdentityStatus.ACCEPTED.value and alias_norm in weak_aliases:
+                status = IdentityStatus.ACCEPTED_PROVISIONAL.value
+                reason = (
+                    "Exact name/context co-occurrence uses a weak organisation alias "
+                    "that is subsumed by a materially more specific account entity; "
+                    "downgraded to provisional identity evidence."
+                )
+            reason = f"{reason} Context alias: {alias}."
+            scored.append(
+                (
+                    status_rank.get(status, 0),
+                    -position,
+                    status,
+                    match.excerpt,
+                    reason,
+                )
+            )
+
+        _, _, status, excerpt, reason = max(scored, key=lambda item: (item[0], item[1]))
+        return status, excerpt, reason
+
     def evaluate(
         self,
         row: dict,
@@ -103,13 +162,15 @@ class AdmissibilityEngine:
                 organisation_domain_status=organisation_domain_status,
                 trusted_official_domains=self.trusted_official_domains,
             )
-            identity_match = self.identity.evaluate(
-                source.full_text,
-                full_name,
-                org_target,
+            identity_status, identity_excerpt, identity_reason = (
+                self._resolve_source_identity(
+                    row=row,
+                    source=source,
+                    full_name=full_name,
+                )
             )
             hits = []
-            if identity_match.status in {
+            if identity_status in {
                 IdentityStatus.ACCEPTED.value,
                 IdentityStatus.ACCEPTED_PROVISIONAL.value,
             }:
@@ -121,9 +182,9 @@ class AdmissibilityEngine:
             evaluated.append(
                 EvaluatedSource(
                     source=source,
-                    identity_status=identity_match.status,
-                    identity_excerpt=identity_match.excerpt,
-                    identity_reason=identity_match.reason,
+                    identity_status=identity_status,
+                    identity_excerpt=identity_excerpt,
+                    identity_reason=identity_reason,
                     evidence_hits=hits,
                 )
             )
@@ -242,9 +303,7 @@ class AdmissibilityEngine:
             if item.source.source_type in official_types
             and any(hit.category == target_category for hit in item.evidence_hits)
         ]
-        excluded_unverified = {
-            SourceType.OFFICIAL_CANDIDATE.value,
-        }
+        excluded_unverified = {SourceType.OFFICIAL_CANDIDATE.value}
         if not self.allow_auto_official_high:
             excluded_unverified.add(SourceType.OFFICIAL_AUTO_HIGH.value)
         professional = [
