@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import tempfile
@@ -74,7 +75,7 @@ with public_tab:
     st.write("No real people or restricted research records are used in this tab.")
     if st.button("Run synthetic demonstration", type="primary"):
         demo = _synthetic_demo()
-        st.dataframe(demo, use_container_width=True)
+        st.dataframe(demo, width="stretch")
         st.metric("Admissible synthetic cases", int(demo["A_i_B"].sum()))
 
 with restricted_tab:
@@ -88,14 +89,27 @@ with restricted_tab:
         max_urls = st.slider("Maximum candidate URLs per person", 1, 15, 8)
         trusted_text = st.text_area("Trusted official domains (optional, one per line)", help="Only add domains whose official/institutional status has been independently established.")
         allow_auto = st.checkbox("Allow high-confidence automatic official-domain typing", value=False, help="Keep OFF during pre-release validation unless explicitly testing this rule.")
+
+        df: pd.DataFrame | None = None
         if uploaded is not None:
-            df = pd.read_csv(uploaded)
-            st.write(f"Loaded {len(df):,} rows.")
-            preview_cols = [c for c in ["audit_case_id", "person_id", "primary_fair", "priority"] if c in df.columns]
-            if preview_cols:
-                st.dataframe(df[preview_cols].head(20), use_container_width=True)
-        if st.button("Run restricted evidence audit", type="primary", disabled=uploaded is None):
-            df = pd.read_csv(uploaded).head(int(max_cases)).copy()
+            try:
+                uploaded_bytes = uploaded.getvalue()
+                if not uploaded_bytes:
+                    st.error("The uploaded CSV is empty. Please select the original N=150 CSV again.")
+                else:
+                    df = pd.read_csv(io.BytesIO(uploaded_bytes))
+                    st.write(f"Loaded {len(df):,} rows.")
+                    preview_cols = [c for c in ["audit_case_id", "person_id", "primary_fair", "priority"] if c in df.columns]
+                    if preview_cols:
+                        st.dataframe(df[preview_cols].head(20), width="stretch")
+            except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError) as exc:
+                st.error(f"Could not parse the uploaded CSV: {exc}")
+                df = None
+
+        run_disabled = df is None or df.empty
+        if st.button("Run restricted evidence audit", type="primary", disabled=run_disabled):
+            assert df is not None
+            run_df = df.head(int(max_cases)).copy()
             trusted_domains = {line.strip().lower() for line in trusted_text.splitlines() if line.strip()}
             try:
                 provider = SerpAPISearchProvider(api_key=_secret("SERPAPI_API_KEY")) if provider_name == "SerpAPI" else BraveSearchProvider(api_key=_secret("BRAVE_SEARCH_API_KEY"))
@@ -104,14 +118,16 @@ with restricted_tab:
                 st.stop()
             progress_bar = st.progress(0.0)
             status = st.empty()
+
             def update_progress(position: int, total: int, person_id: str) -> None:
                 progress_bar.progress(position / total)
                 status.write(f"Processing {position}/{total}: {person_id}")
+
             with tempfile.TemporaryDirectory(prefix="profair_audit_") as temp:
                 out_dir = Path(temp)
-                results, decisions, manifest = run_batch(df, provider=provider, output_dir=out_dir, max_queries=max_queries, max_urls_per_person=max_urls, trusted_official_domains=trusted_domains, allow_auto_official_high=allow_auto, progress=update_progress, checkpoint_every=10)
+                results, decisions, manifest = run_batch(run_df, provider=provider, output_dir=out_dir, max_queries=max_queries, max_urls_per_person=max_urls, trusted_official_domains=trusted_domains, allow_auto_official_high=allow_auto, progress=update_progress, checkpoint_every=10)
                 status.success("Audit run completed.")
-                st.dataframe(results, use_container_width=True)
+                st.dataframe(results, width="stretch")
                 c1, c2, c3, c4 = st.columns(4)
                 c1.metric("A=1", int(results["A_i_B"].sum()))
                 c2.metric("Woman", int((results["final_category"] == "Woman").sum()))
