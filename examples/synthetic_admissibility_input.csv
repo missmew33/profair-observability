@@ -1,0 +1,4 @@
+person_id,full_name,org_search_target,organisation_domain,country_code,primary_fair,preliminary_classification
+SYN_001,Alex Morgan,Northstar Mobility,northstarmobility.example,XX,Synthetic Fair A,
+SYN_002,Jordan Lee,Helio Systems,,XX,Synthetic Fair A,
+SYN_003,Sam Rivera,Arcadia Labs,,XX,Synthetic Fair B,

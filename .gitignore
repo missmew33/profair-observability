@@ -28,6 +28,10 @@ restricted*
 *.parquet
 *.feather
 
+.profair_cache/
+audit_output/
+.streamlit/secrets.toml
+
 .env
 .env.*
 *.pem
