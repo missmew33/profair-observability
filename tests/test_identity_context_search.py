@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from profair_observability.admissibility.engine import AdmissibilityEngine
 from profair_observability.admissibility.schema import (
-    RetrievedSource,
     RetrievalStatus,
+    RetrievedSource,
     SearchCandidate,
 )
 from profair_observability.admissibility.search import (
