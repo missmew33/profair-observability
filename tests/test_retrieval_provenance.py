@@ -6,8 +6,8 @@ import pytest
 from profair_observability.admissibility.batch import run_batch
 from profair_observability.admissibility.retrieval import SourceRetriever
 from profair_observability.admissibility.schema import (
-    RetrievedSource,
     RetrievalStatus,
+    RetrievedSource,
     SearchCandidate,
 )
 from profair_observability.admissibility.search import SearchProvider
