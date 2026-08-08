@@ -39,6 +39,12 @@ class SourceType(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class OrganisationDomainStatus(StrEnum):
+    VERIFIED = "VERIFIED"
+    CANDIDATE = "CANDIDATE"
+    UNKNOWN = "UNKNOWN"
+
+
 class IndependenceStatus(StrEnum):
     INDEPENDENT = "INDEPENDENT"
     SAME_DOMAIN = "SAME_DOMAIN"
@@ -113,7 +119,14 @@ class PersonDecision:
     full_name: str = ""
     org_search_target: str = ""
     primary_fair: str = ""
+    organisation_domain: str = ""
+    organisation_domain_status: str = OrganisationDomainStatus.UNKNOWN.value
+    candidate_organisation_domains: list[str] = field(default_factory=list)
     identity_resolved: bool = False
+    identity_resolution_rule: str = ""
+    accepted_identity_count: int = 0
+    provisional_identity_count: int = 0
+    identity_source_independence_status: str = IndependenceStatus.UNDETERMINED.value
     A_i_B: int = 0
     final_category: str = FinalCategory.NOT_CLASSIFIED.value
     decision_rule: str = ""
@@ -135,7 +148,18 @@ class PersonDecision:
             "full_name": self.full_name,
             "org_search_target": self.org_search_target,
             "primary_fair": self.primary_fair,
+            "organisation_domain": self.organisation_domain,
+            "organisation_domain_status": self.organisation_domain_status,
+            "candidate_organisation_domains": ";".join(
+                self.candidate_organisation_domains
+            ),
             "identity_resolved": self.identity_resolved,
+            "identity_resolution_rule": self.identity_resolution_rule,
+            "accepted_identity_count": self.accepted_identity_count,
+            "provisional_identity_count": self.provisional_identity_count,
+            "identity_source_independence_status": (
+                self.identity_source_independence_status
+            ),
             "A_i_B": self.A_i_B,
             "final_category": self.final_category,
             "decision_rule": self.decision_rule,
