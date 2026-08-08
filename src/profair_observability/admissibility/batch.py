@@ -87,7 +87,7 @@ def _technical_search_failure(
         A_i_B=0,
         final_category="",
         decision_rule="technical_search_failure_not_analytical",
-        processing_status="TECHNICAL_SEARCH_FAILURE",
+        processing_status="TECHNICAL_FAILURE",
         search_attempt_count=len(attempts),
         search_error_count=len(attempts),
         search_attempts=attempts,
@@ -284,7 +284,7 @@ def run_batch(
         if not results.empty
         else 0,
         "n_technical_search_failure": int(
-            (results["processing_status"] == "TECHNICAL_SEARCH_FAILURE").sum()
+            (results["processing_status"] == "TECHNICAL_FAILURE").sum()
         )
         if not results.empty
         else 0,
