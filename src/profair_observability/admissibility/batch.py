@@ -263,6 +263,12 @@ def run_batch(
             ),
         },
     )
+    technical_search = int(
+        (results["processing_status"] == "TECHNICAL_FAILURE").sum()
+    ) if not results.empty else 0
+    technical_retrieval = int(
+        (results["processing_status"] == "TECHNICAL_RETRIEVAL_FAILURE").sum()
+    ) if not results.empty else 0
     manifest["summary"] = {
         "n_admissible": int(results["A_i_B"].sum())
         if not results.empty
@@ -283,19 +289,9 @@ def run_batch(
         )
         if not results.empty
         else 0,
-        "n_technical_search_failure": int(
-            (results["processing_status"] == "TECHNICAL_FAILURE").sum()
-        )
-        if not results.empty
-        else 0,
-        "n_technical_retrieval_failure": int(
-            (
-                results["processing_status"]
-                == "TECHNICAL_RETRIEVAL_FAILURE"
-            ).sum()
-        )
-        if not results.empty
-        else 0,
+        "n_technical_failure": technical_search + technical_retrieval,
+        "n_technical_search_failure": technical_search,
+        "n_technical_retrieval_failure": technical_retrieval,
         "n_partial_search_failure": int(
             (results["processing_status"] == "PARTIAL_SEARCH_FAILURE").sum()
         )
