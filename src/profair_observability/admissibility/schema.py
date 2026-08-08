@@ -122,6 +122,10 @@ class PersonDecision:
     qualifying_official_count: int = 0
     qualifying_professional_count: int = 0
     evidence_source_count: int = 0
+    processing_status: str = "COMPLETED"
+    search_attempt_count: int = 0
+    search_error_count: int = 0
+    search_attempts: list[dict[str, Any]] = field(default_factory=list)
     sources: list[EvaluatedSource] = field(default_factory=list)
 
     def to_flat_dict(self) -> dict[str, Any]:
@@ -140,6 +144,9 @@ class PersonDecision:
             "qualifying_official_count": self.qualifying_official_count,
             "qualifying_professional_count": self.qualifying_professional_count,
             "evidence_source_count": self.evidence_source_count,
+            "processing_status": self.processing_status,
+            "search_attempt_count": self.search_attempt_count,
+            "search_error_count": self.search_error_count,
         }
 
     def to_provenance_dict(self) -> dict[str, Any]:
