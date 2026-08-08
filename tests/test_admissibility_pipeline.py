@@ -8,6 +8,7 @@ import requests
 
 from profair_observability.admissibility.batch import run_batch
 from profair_observability.admissibility.engine import AdmissibilityEngine
+from profair_observability.admissibility.evidence import EvidenceExtractor
 from profair_observability.admissibility.independence import assess_pair
 from profair_observability.admissibility.identity import IdentityResolver
 from profair_observability.admissibility.privacy import enforce_public_mode
@@ -121,6 +122,39 @@ def test_gender_marker_elsewhere_on_page_is_not_attributed() -> None:
     )
     assert decision.A_i_B == 0
     assert decision.final_category == "Indeterminate"
+
+
+def test_flattened_contact_list_does_not_assign_english_director_to_target() -> None:
+    extractor = EvidenceExtractor()
+    text = (
+        "Key Contacts Laurent Example Director Of Development "
+        "María Target Directora De Marketing Alexandra Example"
+    )
+    hits = extractor.extract(text, "María Target", "https://example.test/team")
+    assert [(hit.category, hit.marker) for hit in hits] == [
+        ("Woman", "directora")
+    ]
+
+
+def test_marker_for_other_person_later_in_sentence_is_not_attributed() -> None:
+    extractor = EvidenceExtractor()
+    text = (
+        "Target Person performed with the orchestra, conducted by Maestro Other, "
+        "director titular del Teatro Ejemplo."
+    )
+    hits = extractor.extract(text, "Target Person", "https://example.test/news")
+    assert hits == []
+
+
+def test_english_president_near_byline_is_not_gender_evidence() -> None:
+    extractor = EvidenceExtractor()
+    text = (
+        "News headline President Other attends summit Mariam Target Journalist "
+        "Country PUBLISHED 26 September 2021 President Ibrahim Other concluded "
+        "the official visit."
+    )
+    hits = extractor.extract(text, "Mariam Target", "https://example.test/news")
+    assert hits == []
 
 
 def test_exact_duplicate_sources_are_not_independent() -> None:
