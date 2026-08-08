@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
 
 import pandas as pd
@@ -9,10 +10,10 @@ import pandas as pd
 from .engine import AdmissibilityEngine
 from .provenance import build_manifest, write_jsonl
 from .retrieval import SourceRetriever
-from .schema import REQUIRED_INPUT_FIELDS, PersonDecision
+from .schema import REQUIRED_INPUT_FIELDS, PersonDecision, RetrievalStatus
 from .search import QueryBuilder, SearchProvider, collect_candidates
 
-PIPELINE_VERSION = "2.2.6-pre-release"
+PIPELINE_VERSION = "2.2.7-pre-release"
 
 
 def validate_input(df: pd.DataFrame) -> None:
@@ -28,6 +29,44 @@ def validate_input(df: pd.DataFrame) -> None:
 def _provider_attempts(provider: SearchProvider, start: int) -> list[dict]:
     attempts = getattr(provider, "attempts", [])
     return [dict(item) for item in attempts[start:]]
+
+
+def _candidate_provenance(candidates: list) -> list[dict]:
+    return [
+        {
+            "query": item.query,
+            "provider": item.provider,
+            "rank": item.rank,
+            "url": item.url,
+            "title": item.title,
+        }
+        for item in candidates
+    ]
+
+
+def _retrieval_provenance(retrieved: list) -> list[dict]:
+    fields = (
+        "query",
+        "provider",
+        "rank",
+        "requested_url",
+        "final_url",
+        "retrieved_at",
+        "retrieval_status",
+        "http_status",
+        "content_type",
+        "content_sha256",
+        "page_title",
+        "source_type",
+        "source_type_confidence",
+        "source_type_reason",
+        "from_cache",
+        "error_message",
+    )
+    return [
+        {field: getattr(item, field) for field in fields}
+        for item in retrieved
+    ]
 
 
 def _technical_search_failure(
@@ -49,11 +88,43 @@ def _technical_search_failure(
         A_i_B=0,
         final_category="",
         decision_rule="technical_search_failure_not_analytical",
-        processing_status="TECHNICAL_FAILURE",
+        processing_status="TECHNICAL_SEARCH_FAILURE",
         search_attempt_count=len(attempts),
         search_error_count=len(attempts),
         search_attempts=attempts,
     )
+
+
+def _mark_retrieval_status(
+    decision: PersonDecision,
+    *,
+    candidate_count: int,
+    full_text_count: int,
+    search_error_count: int,
+) -> None:
+    retrieval_error_count = candidate_count - full_text_count
+    decision.retrieval_error_count = max(0, retrieval_error_count)
+
+    if candidate_count > 0 and full_text_count == 0:
+        decision.identity_resolved = False
+        decision.identity_resolution_rule = (
+            "technical_retrieval_failure_not_analytical"
+        )
+        decision.A_i_B = 0
+        decision.final_category = ""
+        decision.decision_rule = "technical_retrieval_failure_not_analytical"
+        decision.screening_conflict = False
+        decision.processing_status = "TECHNICAL_RETRIEVAL_FAILURE"
+        return
+
+    retrieval_partial = candidate_count > full_text_count
+    search_partial = search_error_count > 0
+    if retrieval_partial and search_partial:
+        decision.processing_status = "PARTIAL_SEARCH_AND_RETRIEVAL_FAILURE"
+    elif retrieval_partial:
+        decision.processing_status = "PARTIAL_RETRIEVAL_FAILURE"
+    elif search_partial:
+        decision.processing_status = "PARTIAL_SEARCH_FAILURE"
 
 
 def run_batch(
@@ -117,8 +188,20 @@ def run_batch(
             decision.search_attempt_count = len(person_attempts)
             decision.search_error_count = len(search_errors)
             decision.search_attempts = person_attempts
-            if search_errors:
-                decision.processing_status = "PARTIAL_SEARCH_FAILURE"
+            decision.search_candidates = _candidate_provenance(candidates)
+            decision.retrieval_attempts = _retrieval_provenance(retrieved)
+            full_text_count = sum(
+                1
+                for item in retrieved
+                if item.retrieval_status
+                == RetrievalStatus.FULL_TEXT_RETRIEVED.value
+            )
+            _mark_retrieval_status(
+                decision,
+                candidate_count=len(candidates),
+                full_text_count=full_text_count,
+                search_error_count=len(search_errors),
+            )
 
         decisions.append(decision)
         flat = decision.to_flat_dict()
@@ -128,7 +211,7 @@ def run_batch(
         flat["retrieved_full_text_count"] = sum(
             1
             for item in retrieved
-            if item.retrieval_status == "FULL_TEXT_RETRIEVED"
+            if item.retrieval_status == RetrievalStatus.FULL_TEXT_RETRIEVED.value
         )
         flat_rows.append(flat)
 
@@ -172,6 +255,10 @@ def run_batch(
             "search_budget_rule": (
                 "candidate URL budget is distributed across distinct queries"
             ),
+            "retrieval_failure_rule": (
+                "zero full-text retrievals after candidate discovery are "
+                "technical failures, not analytical Not Classified cases"
+            ),
             "organisation_domain_rule": (
                 "organisation_domain is primary only when status=VERIFIED"
             ),
@@ -197,8 +284,16 @@ def run_batch(
         )
         if not results.empty
         else 0,
-        "n_technical_failure": int(
-            (results["processing_status"] == "TECHNICAL_FAILURE").sum()
+        "n_technical_search_failure": int(
+            (results["processing_status"] == "TECHNICAL_SEARCH_FAILURE").sum()
+        )
+        if not results.empty
+        else 0,
+        "n_technical_retrieval_failure": int(
+            (
+                results["processing_status"]
+                == "TECHNICAL_RETRIEVAL_FAILURE"
+            ).sum()
         )
         if not results.empty
         else 0,
@@ -207,7 +302,26 @@ def run_batch(
         )
         if not results.empty
         else 0,
+        "n_partial_retrieval_failure": int(
+            (
+                results["processing_status"]
+                == "PARTIAL_RETRIEVAL_FAILURE"
+            ).sum()
+        )
+        if not results.empty
+        else 0,
+        "n_partial_search_and_retrieval_failure": int(
+            (
+                results["processing_status"]
+                == "PARTIAL_SEARCH_AND_RETRIEVAL_FAILURE"
+            ).sum()
+        )
+        if not results.empty
+        else 0,
         "search_error_count": int(results["search_error_count"].sum())
+        if not results.empty
+        else 0,
+        "retrieval_error_count": int(results["retrieval_error_count"].sum())
         if not results.empty
         else 0,
     }
